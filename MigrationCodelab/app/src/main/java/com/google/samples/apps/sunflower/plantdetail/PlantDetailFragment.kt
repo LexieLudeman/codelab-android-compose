@@ -21,6 +21,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.app.ShareCompat
 import androidx.core.widget.NestedScrollView
@@ -34,49 +35,56 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.samples.apps.sunflower.R
 import com.google.samples.apps.sunflower.data.Plant
 import com.google.samples.apps.sunflower.databinding.FragmentPlantDetailBinding
+import com.google.samples.apps.sunflower.theme.SunflowerTheme
 import com.google.samples.apps.sunflower.utilities.InjectorUtils
 import com.google.samples.apps.sunflower.viewmodels.PlantDetailViewModel
 
-/**
- * A fragment representing a single Plant detail screen.
- */
+/** A fragment representing a single Plant detail screen. */
 class PlantDetailFragment : Fragment() {
 
-    private val args: PlantDetailFragmentArgs by navArgs()
+  private val args: PlantDetailFragmentArgs by navArgs()
 
-    private val plantDetailViewModel: PlantDetailViewModel by viewModels {
-        InjectorUtils.providePlantDetailViewModelFactory(requireActivity(), args.plantId)
-    }
+  private val plantDetailViewModel: PlantDetailViewModel by viewModels {
+    InjectorUtils.providePlantDetailViewModelFactory(requireActivity(), args.plantId)
+  }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        val binding = DataBindingUtil.inflate<FragmentPlantDetailBinding>(
-            inflater,
-            R.layout.fragment_plant_detail,
-            container,
-            false
-        ).apply {
-            viewModel = plantDetailViewModel
-            lifecycleOwner = viewLifecycleOwner
-            callback = object : Callback {
-                override fun add(plant: Plant?) {
-                    plant?.let {
+  override fun onCreateView(
+      inflater: LayoutInflater,
+      container: ViewGroup?,
+      savedInstanceState: Bundle?
+  ): View {
+    val binding =
+        DataBindingUtil.inflate<FragmentPlantDetailBinding>(
+                inflater, R.layout.fragment_plant_detail, container, false)
+            .apply {
+              viewModel = plantDetailViewModel
+              lifecycleOwner = viewLifecycleOwner
+              callback =
+                  object : Callback {
+                    override fun add(plant: Plant?) {
+                      plant?.let {
                         hideAppBarFab(fab)
                         plantDetailViewModel.addPlantToGarden()
                         Snackbar.make(root, R.string.added_plant_to_garden, Snackbar.LENGTH_LONG)
                             .show()
+                      }
                     }
+                  }
+              composeView.apply {
+                setViewCompositionStrategy(
+                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+                setContent {
+                  SunflowerTheme {
+                    PlantDetailDescription(plantDetailViewModel = plantDetailViewModel)
+                  }
                 }
-            }
+              }
 
-            var isToolbarShown = false
+              var isToolbarShown = false
 
-            // scroll change listener begins at Y = 0 when image is fully collapsed
-            plantDetailScrollview.setOnScrollChangeListener(
-                NestedScrollView.OnScrollChangeListener { _, _, scrollY, _, _ ->
+              // scroll change listener begins at Y = 0 when image is fully collapsed
+              plantDetailScrollview.setOnScrollChangeListener(
+                  NestedScrollView.OnScrollChangeListener { _, _, scrollY, _, _ ->
 
                     // User scrolled past image to height of toolbar and the title text is
                     // underneath the toolbar, so the toolbar should be shown.
@@ -85,67 +93,67 @@ class PlantDetailFragment : Fragment() {
                     // The new state of the toolbar differs from the previous state; update
                     // appbar and toolbar attributes.
                     if (isToolbarShown != shouldShowToolbar) {
-                        isToolbarShown = shouldShowToolbar
+                      isToolbarShown = shouldShowToolbar
 
-                        // Use shadow animator to add elevation if toolbar is shown
-                        appbar.isActivated = shouldShowToolbar
+                      // Use shadow animator to add elevation if toolbar is shown
+                      appbar.isActivated = shouldShowToolbar
 
-                        // Show the plant name if toolbar is shown
-                        toolbarLayout.isTitleEnabled = shouldShowToolbar
+                      // Show the plant name if toolbar is shown
+                      toolbarLayout.isTitleEnabled = shouldShowToolbar
                     }
-                }
-            )
+                  })
 
-            toolbar.setNavigationOnClickListener { view ->
-                view.findNavController().navigateUp()
-            }
+              toolbar.setNavigationOnClickListener { view -> view.findNavController().navigateUp() }
 
-            toolbar.setOnMenuItemClickListener { item ->
+              toolbar.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
-                    R.id.action_share -> {
-                        createShareIntent()
-                        true
-                    }
-                    else -> false
+                  R.id.action_share -> {
+                    createShareIntent()
+                    true
+                  }
+                  else -> false
                 }
+              }
             }
-        }
-        setHasOptionsMenu(true)
+    setHasOptionsMenu(true)
 
-        return binding.root
-    }
+    return binding.root
+  }
 
-    // Helper function for calling a share functionality.
-    // Should be used when user presses a share button/menu item.
-    @Suppress("DEPRECATION")
-    private fun createShareIntent() {
-        val shareText = plantDetailViewModel.plant.value.let { plant ->
-            if (plant == null) {
-                ""
-            } else {
-                getString(R.string.share_text_plant, plant.name)
-            }
+  // Helper function for calling a share functionality.
+  // Should be used when user presses a share button/menu item.
+  @Suppress("DEPRECATION")
+  private fun createShareIntent() {
+    val shareText =
+        plantDetailViewModel.plant.value.let { plant ->
+          if (plant == null) {
+            ""
+          } else {
+            getString(R.string.share_text_plant, plant.name)
+          }
         }
-        val shareIntent = ShareCompat.IntentBuilder.from(requireActivity())
+    val shareIntent =
+        ShareCompat.IntentBuilder.from(requireActivity())
             .setText(shareText)
             .setType("text/plain")
             .createChooserIntent()
             .addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-        startActivity(shareIntent)
-    }
+    startActivity(shareIntent)
+  }
 
-    // FloatingActionButtons anchored to AppBarLayouts have their visibility controlled by the scroll position.
-    // We want to turn this behavior off to hide the FAB when it is clicked.
-    //
-    // This is adapted from Chris Banes' Stack Overflow answer: https://stackoverflow.com/a/41442923
-    private fun hideAppBarFab(fab: FloatingActionButton) {
-        val params = fab.layoutParams as CoordinatorLayout.LayoutParams
-        val behavior = params.behavior as FloatingActionButton.Behavior
-        behavior.isAutoHideEnabled = false
-        fab.hide()
-    }
+  // FloatingActionButtons anchored to AppBarLayouts have their visibility controlled by the scroll
+  // position.
+  // We want to turn this behavior off to hide the FAB when it is clicked.
+  //
+  // This is adapted from Chris Banes' Stack Overflow answer: https://stackoverflow.com/a/41442923
+  private fun hideAppBarFab(fab: FloatingActionButton) {
+    val params = fab.layoutParams as CoordinatorLayout.LayoutParams
+    val behavior = params.behavior as FloatingActionButton.Behavior
+    behavior.isAutoHideEnabled = false
+    fab.hide()
+  }
 
-    interface Callback {
-        fun add(plant: Plant?)
-    }
+  interface Callback {
+    fun add(plant: Plant?)
+  }
 }
