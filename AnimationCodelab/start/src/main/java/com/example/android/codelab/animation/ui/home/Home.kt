@@ -17,6 +17,25 @@
 package com.example.android.codelab.animation.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColor
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.calculateTargetValue
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.splineBasedDecay
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -99,153 +118,133 @@ import com.example.android.codelab.animation.ui.Green300
 import com.example.android.codelab.animation.ui.Green800
 import com.example.android.codelab.animation.ui.Purple100
 import com.example.android.codelab.animation.ui.Purple700
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class TabPage {
-    Home, Work
+  Home,
+  Work
 }
 
-/**
- * Shows the entire screen.
- */
+/** Shows the entire screen. */
 @Composable
 fun Home() {
-    // String resources.
-    val allTasks = stringArrayResource(R.array.tasks)
-    val allTopics = stringArrayResource(R.array.topics).toList()
+  // String resources.
+  val allTasks = stringArrayResource(R.array.tasks)
+  val allTopics = stringArrayResource(R.array.topics).toList()
 
-    // The currently selected tab.
-    var tabPage by remember { mutableStateOf(TabPage.Home) }
+  // The currently selected tab.
+  var tabPage by remember { mutableStateOf(TabPage.Home) }
 
-    // True if the whether data is currently loading.
-    var weatherLoading by remember { mutableStateOf(false) }
+  // True if the whether data is currently loading.
+  var weatherLoading by remember { mutableStateOf(false) }
 
-    // Holds all the tasks currently shown on the task list.
-    val tasks = remember { mutableStateListOf(*allTasks) }
+  // Holds all the tasks currently shown on the task list.
+  val tasks = remember { mutableStateListOf(*allTasks) }
 
-    // Holds the topic that is currently expanded to show its body.
-    var expandedTopic by remember { mutableStateOf<String?>(null) }
+  // Holds the topic that is currently expanded to show its body.
+  var expandedTopic by remember { mutableStateOf<String?>(null) }
 
-    // True if the message about the edit feature is shown.
-    var editMessageShown by remember { mutableStateOf(false) }
+  // True if the message about the edit feature is shown.
+  var editMessageShown by remember { mutableStateOf(false) }
 
-    // Simulates loading weather data. This takes 3 seconds.
-    suspend fun loadWeather() {
-        if (!weatherLoading) {
-            weatherLoading = true
-            delay(3000L)
-            weatherLoading = false
-        }
+  // Simulates loading weather data. This takes 3 seconds.
+  suspend fun loadWeather() {
+    if (!weatherLoading) {
+      weatherLoading = true
+      delay(3000L)
+      weatherLoading = false
     }
+  }
 
-    // Shows the message about edit feature.
-    suspend fun showEditMessage() {
-        if (!editMessageShown) {
-            editMessageShown = true
-            delay(3000L)
-            editMessageShown = false
-        }
+  // Shows the message about edit feature.
+  suspend fun showEditMessage() {
+    if (!editMessageShown) {
+      editMessageShown = true
+      delay(3000L)
+      editMessageShown = false
     }
+  }
 
-    // Load the weather at the initial composition.
-    LaunchedEffect(Unit) {
-        loadWeather()
-    }
+  // Load the weather at the initial composition.
+  LaunchedEffect(Unit) { loadWeather() }
 
-    val lazyListState = rememberLazyListState()
+  val lazyListState = rememberLazyListState()
 
-    // The background color. The value is changed by the current tab.
-    // TODO 1: Animate this color change.
-    val backgroundColor = if (tabPage == TabPage.Home) Purple100 else Green300
+  // The background color. The value is changed by the current tab.
+  val backgroundColor by
+      animateColorAsState(
+          if (tabPage == TabPage.Home) Purple100 else Green300,
+          label = "Background Color Animation")
 
-    // The coroutine scope for event handlers calling suspend functions.
-    val coroutineScope = rememberCoroutineScope()
-    Scaffold(
-        topBar = {
-            HomeTabBar(
-                backgroundColor = backgroundColor,
-                tabPage = tabPage,
-                onTabSelected = { tabPage = it }
-            )
-        },
-        backgroundColor = backgroundColor,
-        floatingActionButton = {
-            HomeFloatingActionButton(
-                extended = lazyListState.isScrollingUp(),
-                onClick = {
-                    coroutineScope.launch {
-                        showEditMessage()
-                    }
-                }
-            )
-        }
-    ) { padding ->
+  // The coroutine scope for event handlers calling suspend functions.
+  val coroutineScope = rememberCoroutineScope()
+  Scaffold(
+      topBar = {
+        HomeTabBar(
+            backgroundColor = backgroundColor, tabPage = tabPage, onTabSelected = { tabPage = it })
+      },
+      backgroundColor = backgroundColor,
+      floatingActionButton = {
+        HomeFloatingActionButton(
+            extended = lazyListState.isScrollingUp(),
+            onClick = { coroutineScope.launch { showEditMessage() } })
+      }) { padding ->
         LazyColumn(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 32.dp),
             state = lazyListState,
-            modifier = Modifier.padding(padding)
-        ) {
-            // Weather
-            item { Header(title = stringResource(R.string.weather)) }
-            item { Spacer(modifier = Modifier.height(16.dp)) }
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = 2.dp
-                ) {
-                    if (weatherLoading) {
-                        LoadingRow()
-                    } else {
-                        WeatherRow(onRefresh = {
-                            coroutineScope.launch {
-                                loadWeather()
-                            }
-                        })
-                    }
+            modifier = Modifier.padding(padding)) {
+              // Weather
+              item { Header(title = stringResource(R.string.weather)) }
+              item { Spacer(modifier = Modifier.height(16.dp)) }
+              item {
+                Surface(modifier = Modifier.fillMaxWidth(), elevation = 2.dp) {
+                  if (weatherLoading) {
+                    LoadingRow()
+                  } else {
+                    WeatherRow(onRefresh = { coroutineScope.launch { loadWeather() } })
+                  }
                 }
-            }
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+              }
+              item { Spacer(modifier = Modifier.height(32.dp)) }
 
-            // Topics
-            item { Header(title = stringResource(R.string.topics)) }
-            item { Spacer(modifier = Modifier.height(16.dp)) }
-            items(allTopics) { topic ->
+              // Topics
+              item { Header(title = stringResource(R.string.topics)) }
+              item { Spacer(modifier = Modifier.height(16.dp)) }
+              items(allTopics) { topic ->
                 TopicRow(
                     topic = topic,
                     expanded = expandedTopic == topic,
-                    onClick = {
-                        expandedTopic = if (expandedTopic == topic) null else topic
-                    }
-                )
-            }
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+                    onClick = { expandedTopic = if (expandedTopic == topic) null else topic })
+              }
+              item { Spacer(modifier = Modifier.height(32.dp)) }
 
-            // Tasks
-            item { Header(title = stringResource(R.string.tasks)) }
-            item { Spacer(modifier = Modifier.height(16.dp)) }
-            if (tasks.isEmpty()) {
+              // Tasks
+              item { Header(title = stringResource(R.string.tasks)) }
+              item { Spacer(modifier = Modifier.height(16.dp)) }
+              if (tasks.isEmpty()) {
                 item {
-                    TextButton(onClick = { tasks.clear(); tasks.addAll(allTasks) }) {
+                  TextButton(
+                      onClick = {
+                        tasks.clear()
+                        tasks.addAll(allTasks)
+                      }) {
                         Text(stringResource(R.string.add_tasks))
-                    }
+                      }
                 }
-            }
-            items(count = tasks.size) { i ->
+              }
+              items(count = tasks.size) { i ->
                 val task = tasks.getOrNull(i)
                 if (task != null) {
-                    key(task) {
-                        TaskRow(
-                            task = task,
-                            onRemove = { tasks.remove(task) }
-                        )
-                    }
+                  key(task) { TaskRow(task = task, onRemove = { tasks.remove(task) }) }
                 }
+              }
             }
-        }
         EditMessage(editMessageShown)
-    }
+      }
 }
 
 /**
@@ -255,75 +254,63 @@ fun Home() {
  */
 // AnimatedVisibility is currently an experimental API in Compose Animation.
 @Composable
-private fun HomeFloatingActionButton(
-    extended: Boolean,
-    onClick: () -> Unit
-) {
-    // Use `FloatingActionButton` rather than `ExtendedFloatingActionButton` for full control on
-    // how it should animate.
-    FloatingActionButton(onClick = onClick) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = null
-            )
-            // Toggle the visibility of the content with animation.
-            // TODO 2-1: Animate this visibility change.
-            if (extended) {
-                Text(
-                    text = stringResource(R.string.edit),
-                    modifier = Modifier
-                        .padding(start = 8.dp, top = 3.dp)
-                )
-            }
-        }
+private fun HomeFloatingActionButton(extended: Boolean, onClick: () -> Unit) {
+  // Use `FloatingActionButton` rather than `ExtendedFloatingActionButton` for full control on
+  // how it should animate.
+  FloatingActionButton(onClick = onClick) {
+    Row(modifier = Modifier.padding(horizontal = 16.dp)) {
+      Icon(imageVector = Icons.Default.Edit, contentDescription = null)
+      // Toggle the visibility of the content with animation.
+      AnimatedVisibility(visible = extended) {
+        Text(
+            text = stringResource(R.string.edit),
+            modifier = Modifier.padding(start = 8.dp, top = 3.dp))
+      }
     }
+  }
 }
 
-/**
- * Shows a message that the edit feature is not available.
- */
+/** Shows a message that the edit feature is not available. */
 @Composable
 private fun EditMessage(shown: Boolean) {
-    // TODO 2-2: The message should slide down from the top on appearance and slide up on
-    //           disappearance.
-    AnimatedVisibility(
-        visible = shown
-    ) {
+  AnimatedVisibility(
+      visible = shown,
+      enter =
+          slideInVertically(
+              initialOffsetY = { fullHeight -> -fullHeight },
+              animationSpec = tween(durationMillis = 150, easing = LinearOutSlowInEasing)),
+      exit =
+          slideOutVertically(
+              targetOffsetY = { fullHeight -> -fullHeight },
+              animationSpec = tween(durationMillis = 250, easing = FastOutLinearInEasing))) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colors.secondary,
-            elevation = 4.dp
-        ) {
-            Text(
-                text = stringResource(R.string.edit_message),
-                modifier = Modifier.padding(16.dp)
-            )
-        }
-    }
+            elevation = 4.dp) {
+              Text(text = stringResource(R.string.edit_message), modifier = Modifier.padding(16.dp))
+            }
+      }
 }
 
-/**
- * Returns whether the lazy list is currently scrolling up.
- */
+/** Returns whether the lazy list is currently scrolling up. */
 @Composable
 private fun LazyListState.isScrollingUp(): Boolean {
-    var previousIndex by remember(this) { mutableStateOf(firstVisibleItemIndex) }
-    var previousScrollOffset by remember(this) { mutableStateOf(firstVisibleItemScrollOffset) }
-    return remember(this) {
+  var previousIndex by remember(this) { mutableStateOf(firstVisibleItemIndex) }
+  var previousScrollOffset by remember(this) { mutableStateOf(firstVisibleItemScrollOffset) }
+  return remember(this) {
         derivedStateOf {
-            if (previousIndex != firstVisibleItemIndex) {
+          if (previousIndex != firstVisibleItemIndex) {
                 previousIndex > firstVisibleItemIndex
-            } else {
+              } else {
                 previousScrollOffset >= firstVisibleItemScrollOffset
-            }.also {
+              }
+              .also {
                 previousIndex = firstVisibleItemIndex
                 previousScrollOffset = firstVisibleItemScrollOffset
-            }
+              }
         }
-    }.value
+      }
+      .value
 }
 
 /**
@@ -332,14 +319,11 @@ private fun LazyListState.isScrollingUp(): Boolean {
  * @param title The title to be shown.
  */
 @Composable
-private fun Header(
-    title: String
-) {
-    Text(
-        text = title,
-        modifier = Modifier.semantics { heading() },
-        style = MaterialTheme.typography.h5
-    )
+private fun Header(title: String) {
+  Text(
+      text = title,
+      modifier = Modifier.semantics { heading() },
+      style = MaterialTheme.typography.h5)
 }
 
 /**
@@ -352,50 +336,27 @@ private fun Header(
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 private fun TopicRow(topic: String, expanded: Boolean, onClick: () -> Unit) {
-    TopicRowSpacer(visible = expanded)
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth(),
-        elevation = 2.dp,
-        onClick = onClick
-    ) {
-        // TODO 3: Animate the size change of the content.
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = topic,
-                    style = MaterialTheme.typography.body1
-                )
-            }
-            if (expanded) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.lorem_ipsum),
-                    textAlign = TextAlign.Justify
-                )
-            }
-        }
+  TopicRowSpacer(visible = expanded)
+  Surface(modifier = Modifier.fillMaxWidth(), elevation = 2.dp, onClick = onClick) {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp).animateContentSize()) {
+      Row {
+        Icon(imageVector = Icons.Default.Info, contentDescription = null)
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(text = topic, style = MaterialTheme.typography.body1)
+      }
+      if (expanded) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = stringResource(R.string.lorem_ipsum), textAlign = TextAlign.Justify)
+      }
     }
-    TopicRowSpacer(visible = expanded)
+  }
+  TopicRowSpacer(visible = expanded)
 }
 
-/**
- * Shows a separator for topics.
- */
+/** Shows a separator for topics. */
 @Composable
 fun TopicRowSpacer(visible: Boolean) {
-    AnimatedVisibility(visible = visible) {
-        Spacer(modifier = Modifier.height(8.dp))
-    }
+  AnimatedVisibility(visible = visible) { Spacer(modifier = Modifier.height(8.dp)) }
 }
 
 /**
@@ -411,24 +372,19 @@ private fun HomeTabBar(
     tabPage: TabPage,
     onTabSelected: (tabPage: TabPage) -> Unit
 ) {
-    TabRow(
-        selectedTabIndex = tabPage.ordinal,
-        backgroundColor = backgroundColor,
-        indicator = { tabPositions ->
-            HomeTabIndicator(tabPositions, tabPage)
-        }
-    ) {
+  TabRow(
+      selectedTabIndex = tabPage.ordinal,
+      backgroundColor = backgroundColor,
+      indicator = { tabPositions -> HomeTabIndicator(tabPositions, tabPage) }) {
         HomeTab(
             icon = Icons.Default.Home,
             title = stringResource(R.string.home),
-            onClick = { onTabSelected(TabPage.Home) }
-        )
+            onClick = { onTabSelected(TabPage.Home) })
         HomeTab(
             icon = Icons.Default.AccountBox,
             title = stringResource(R.string.work),
-            onClick = { onTabSelected(TabPage.Work) }
-        )
-    }
+            onClick = { onTabSelected(TabPage.Work) })
+      }
 }
 
 /**
@@ -438,27 +394,44 @@ private fun HomeTabBar(
  * @param tabPage The [TabPage] that is currently selected.
  */
 @Composable
-private fun HomeTabIndicator(
-    tabPositions: List<TabPosition>,
-    tabPage: TabPage
-) {
-    // TODO 4: Animate these value changes.
-    val indicatorLeft = tabPositions[tabPage.ordinal].left
-    val indicatorRight = tabPositions[tabPage.ordinal].right
-    val color = if (tabPage == TabPage.Home) Purple700 else Green800
-    Box(
-        Modifier
-            .fillMaxSize()
-            .wrapContentSize(align = Alignment.BottomStart)
-            .offset(x = indicatorLeft)
-            .width(indicatorRight - indicatorLeft)
-            .padding(4.dp)
-            .fillMaxSize()
-            .border(
-                BorderStroke(2.dp, color),
-                RoundedCornerShape(4.dp)
-            )
-    )
+private fun HomeTabIndicator(tabPositions: List<TabPosition>, tabPage: TabPage) {
+  val transition = updateTransition(targetState = tabPage, label = "Tab Indicator Animation")
+  val indicatorLeft by
+      transition.animateDp(
+          transitionSpec = {
+            if (TabPage.Home isTransitioningTo TabPage.Work) {
+              spring(stiffness = Spring.StiffnessVeryLow)
+            } else {
+              spring(stiffness = Spring.StiffnessMedium)
+            }
+          },
+          label = "Indicator Left") { page ->
+            tabPositions[page.ordinal].left
+          }
+  val indicatorRight by
+      transition.animateDp(
+          transitionSpec = {
+            if (TabPage.Home isTransitioningTo TabPage.Work) {
+              spring(stiffness = Spring.StiffnessMedium)
+            } else {
+              spring(stiffness = Spring.StiffnessVeryLow)
+            }
+          },
+          label = "Indicator Right") { page ->
+            tabPositions[page.ordinal].right
+          }
+  val color by
+      transition.animateColor(label = "Border Color") { page ->
+        if (page == TabPage.Home) Purple700 else Green800
+      }
+  Box(
+      Modifier.fillMaxSize()
+          .wrapContentSize(align = Alignment.BottomStart)
+          .offset(x = indicatorLeft)
+          .width(indicatorRight - indicatorLeft)
+          .padding(4.dp)
+          .fillMaxSize()
+          .border(BorderStroke(2.dp, color), RoundedCornerShape(4.dp)))
 }
 
 /**
@@ -476,20 +449,14 @@ private fun HomeTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null
-        )
+  Row(
+      modifier = modifier.clickable(onClick = onClick).padding(16.dp),
+      horizontalArrangement = Arrangement.Center,
+      verticalAlignment = Alignment.CenterVertically) {
+        Icon(imageVector = icon, contentDescription = null)
         Spacer(modifier = Modifier.width(16.dp))
         Text(text = title)
-    }
+      }
 }
 
 /**
@@ -498,60 +465,54 @@ private fun HomeTab(
  * @param onRefresh Called when the refresh icon button is clicked.
  */
 @Composable
-private fun WeatherRow(
-    onRefresh: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .heightIn(min = 64.dp)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(Amber600)
-        )
+private fun WeatherRow(onRefresh: () -> Unit) {
+  Row(
+      modifier = Modifier.heightIn(min = 64.dp).padding(16.dp),
+      verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Amber600))
         Spacer(modifier = Modifier.width(16.dp))
         Text(text = stringResource(R.string.temperature), fontSize = 24.sp)
         Spacer(modifier = Modifier.weight(1f))
         IconButton(onClick = onRefresh) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = stringResource(R.string.refresh)
-            )
+          Icon(
+              imageVector = Icons.Default.Refresh,
+              contentDescription = stringResource(R.string.refresh))
         }
-    }
+      }
 }
 
-/**
- * Shows the loading state of the weather.
- */
+/** Shows the loading state of the weather. */
 @Composable
 private fun LoadingRow() {
-    // TODO 5: Animate this value between 0f and 1f, then back to 0f repeatedly.
-    val alpha = 1f
-    Row(
-        modifier = Modifier
-            .heightIn(min = 64.dp)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+  val infiniteTransition = rememberInfiniteTransition(label = "infiniteTransition")
+  val alpha by
+      infiniteTransition.animateFloat(
+          initialValue = 0f,
+          targetValue = 1f,
+          animationSpec =
+              infiniteRepeatable(
+                  animation =
+                      keyframes {
+                        durationMillis = 1000
+                        0.7f at 500
+                      },
+                  repeatMode = RepeatMode.Reverse),
+          label = "Alpha Animation")
+  Row(
+      modifier = Modifier.heightIn(min = 64.dp).padding(16.dp),
+      verticalAlignment = Alignment.CenterVertically) {
         Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(Color.LightGray.copy(alpha = alpha))
-        )
+            modifier =
+                Modifier.size(48.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray.copy(alpha = alpha)))
         Spacer(modifier = Modifier.width(16.dp))
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(32.dp)
-                .background(Color.LightGray.copy(alpha = alpha))
-        )
-    }
+            modifier =
+                Modifier.fillMaxWidth()
+                    .height(32.dp)
+                    .background(Color.LightGray.copy(alpha = alpha)))
+      }
 }
 
 /**
@@ -562,28 +523,13 @@ private fun LoadingRow() {
  */
 @Composable
 private fun TaskRow(task: String, onRemove: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .swipeToDismiss(onRemove),
-        elevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = null
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = task,
-                style = MaterialTheme.typography.body1
-            )
-        }
+  Surface(modifier = Modifier.fillMaxWidth().swipeToDismiss(onRemove), elevation = 2.dp) {
+    Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+      Icon(imageVector = Icons.Default.Check, contentDescription = null)
+      Spacer(modifier = Modifier.width(16.dp))
+      Text(text = task, style = MaterialTheme.typography.body1)
     }
+  }
 }
 
 /**
@@ -591,64 +537,57 @@ private fun TaskRow(task: String, onRemove: () -> Unit) {
  *
  * @param onDismissed Called when the element is swiped to the edge of the screen.
  */
-private fun Modifier.swipeToDismiss(
-    onDismissed: () -> Unit
-): Modifier = composed {
-    // TODO 6-1: Create an Animatable instance for the offset of the swiped element.
-    pointerInput(Unit) {
+private fun Modifier.swipeToDismiss(onDismissed: () -> Unit): Modifier = composed {
+  val offsetX = remember { Animatable(0f) } // Add this line
+  pointerInput(Unit) {
         // Used to calculate a settling position of a fling animation.
         val decay = splineBasedDecay<Float>(this)
         // Wrap in a coroutine scope to use suspend functions for touch events and animation.
         coroutineScope {
-            while (true) {
-                // Wait for a touch down event.
-                val pointerId = awaitPointerEventScope { awaitFirstDown().id }
-                // TODO 6-2: Touch detected; the animation should be stopped.
-                // Prepare for drag events and record velocity of a fling.
-                val velocityTracker = VelocityTracker()
-                // Wait for drag events.
-                awaitPointerEventScope {
-                    horizontalDrag(pointerId) { change ->
-                        // TODO 6-3: Apply the drag change to the Animatable offset.
-                        // Record the velocity of the drag.
-                        velocityTracker.addPosition(change.uptimeMillis, change.position)
-                        // Consume the gesture event, not passed to external
-                        if (change.positionChange() != Offset.Zero) change.consume()
-                    }
-                }
-                // Dragging finished. Calculate the velocity of the fling.
-                val velocity = velocityTracker.calculateVelocity().x
-                // TODO 6-4: Calculate the eventual position where the fling should settle
-                //           based on the current offset value and velocity
-                // TODO 6-5: Set the upper and lower bounds so that the animation stops when it
-                //           reaches the edge.
-                launch {
-                    // TODO 6-6: Slide back the element if the settling position does not go beyond
-                    //           the size of the element. Remove the element if it does.
-                }
+          while (true) {
+            // Wait for a touch down event.
+            val pointerId = awaitPointerEventScope { awaitFirstDown().id }
+            offsetX.stop()
+            // Prepare for drag events and record velocity of a fling.
+            val velocityTracker = VelocityTracker()
+            // Wait for drag events.
+            awaitPointerEventScope {
+              horizontalDrag(pointerId) { change ->
+                val horizontalDragOffset = offsetX.value + change.positionChange().x
+                launch { offsetX.snapTo(horizontalDragOffset) }
+                // Record the velocity of the drag.
+                velocityTracker.addPosition(change.uptimeMillis, change.position)
+                // Consume the gesture event, not passed to external
+                if (change.positionChange() != Offset.Zero) change.consume()
+              }
             }
+            // Dragging finished. Calculate the velocity of the fling.
+            val velocity = velocityTracker.calculateVelocity().x
+            val targetOffsetX = decay.calculateTargetValue(offsetX.value, velocity)
+            offsetX.updateBounds(
+                lowerBound = -size.width.toFloat(), upperBound = size.width.toFloat())
+            launch {
+              if (targetOffsetX.absoluteValue <= size.width) {
+                offsetX.animateTo(targetValue = 0f, initialVelocity = velocity)
+              } else {
+                offsetX.animateDecay(velocity, decay)
+                onDismissed()
+              }
+            }
+          }
         }
-    }
-        .offset {
-            // TODO 6-7: Use the animating offset value here.
-            IntOffset(0, 0)
-        }
+      }
+      .offset { IntOffset(offsetX.value.roundToInt(), 0) }
 }
 
 @Preview
 @Composable
 private fun PreviewHomeTabBar() {
-    HomeTabBar(
-        backgroundColor = Purple100,
-        tabPage = TabPage.Home,
-        onTabSelected = {}
-    )
+  HomeTabBar(backgroundColor = Purple100, tabPage = TabPage.Home, onTabSelected = {})
 }
 
 @Preview
 @Composable
 private fun PreviewHome() {
-    AnimationCodelabTheme {
-        Home()
-    }
+  AnimationCodelabTheme { Home() }
 }
